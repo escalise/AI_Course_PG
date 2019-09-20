@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Preprocessing</title>
+    <meta charset="utf-8">
+        <style>
+       @import url(https://fonts.googleapis.com/css?family=Garamond);
+       @import url(https://fonts.googleapis.com/css?family=Muli:400,700,400italic);
+       @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+     </style>
+     <link rel="stylesheet" href="../style.css">
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+### W4995 Applied Machine Learning
+
+# Preprocessing and Feature Transformations
+
+02/06/19
+
+Andreas C. Müller
+
+(Adapted and modified for CC 6021236 @ PCC/Ciencias/UCV by 
+
+Eugenio Scalise, September 2019)
+
+???
+Today we’ll talk about preprocessing and feature engineering.
+What we’re talking about today mostly applies to linear
+models, and not to tree-based models, but it also applies to
+neural nets and kernel SVMs.
+
+FIXME: add quantile transformer
+FIXME: some slides have screenshots
+FIXME: target encoder from dirtycat or categorical encoder contrib package?
+FIXME better example / explanation for target encoding
+FIXME add more complex grid-search pipeline example, add grid-searching over pipeline steps
+FIXME add grid-search column-transformer example
+FIXME add hashing, add Max number of columns
+FIXME walk through example of frequency encoder better, call target encoder
+FIXME add ELS example about leaking information with feature selection!!!
+FIXME add code corresponding to correct and incorrect scaling of test data
+FIXME two table slide for target encoder really confusing
+
+
+---
+class: middle
+
+# Boston Housing Dataset (scikit-learn)
+
+![:scale 90%](images/boston_scatter.png)
+
+
+???
+Let’s take a look at the the boston housing dataset. The idea was to
+predict house prices. Here are the features on the x axis
+and the response, so price, on the y axis.
+
+What are some thing you can notice? (concentrated
+distributions, skewed distibutions, discrete variable,
+linear and non-linear effects, different scales)
+
+The last thing that we're going to do after we did all the
+preprocessing is a little bit more about feature engineering
+and how to add features. Feature engineering is most
+important if we have simple models like linear models. If
+you do something like support vector machines or neural
+networks, you probably don't have to do as much feature
+engineering the because the model can learn more complex
+things themselves.
+---
+
+class: center, middle
+
+#Scaling
+
+
+???
+N/A
+
+---
+
+class: center, middle
+
+.center[
+![:scale 70%](images/boston_ranges.png)
+]
+
+More about Boxplots: https://towardsdatascience.com/understanding-boxplots-5e2df7bcbd51
+
+???
+Let’s start with the different scales.
+
+Many model want data that is on the same scale.
+
+
+We can also see non-gaussian distributions here btw!
+---
+# Scaling and Distances
+
+![:scale 90%](images/knn_scaling.png)
+
+???
+Here is an example of the importance of scaling using a
+distance-based algorithm, K nearest neighbors. My favorite
+toy dataset with two classes in two dimensions. The scatter
+plots look identical, but on the left hand side, the two
+axes have very different scales. The x axis has much larger
+values than the y axis. On the right hand side, I used
+standard scaler and so both features have zero mean and unit
+variance. So what do you think will happen if I use k
+nearest neighbors here? Let's see
+---
+# Scaling and Distances
+
+![:scale 90%](images/knn_scaling2.png)
+
+???
+As you can see, the difference is quite dramatic. Because
+the X axis has such a larger magnitude on the left-hand
+side, only distances along the x axis matter. However, the
+important feature for this task is the y axis. So the
+important feature gets entirely ignored because of the
+different scales. And usually the scales don't have any
+meaning - it could be a matter of changing meters to
+kilometers.
+
+
+Linear models: the different scales mean different penalty.
+L2 is the same for all!
+
+
+---
+class: center
+
+# Ways to Scale Data
+<br />
+![:scale 80%](images/scaler_comparison_scatter.png)
+???
+Here's an illustration of four of the most common ways. One
+of the most common ones that we already saw before is the
+Standard Scaler. StandardScaler subtracts the mean and
+divides by standard deviation. Making all the features have
+a zero mean and a standard deviation of one. One thing about
+this is that it won't guarantee any minimum or maximum
+values. The range can be arbitrarily large. MinMaxScaler
+subtracts minimum and divides by range. Scales between 0 and 1.
+So all the features will have an exact minimum at zero
+and exact maximum at one. This mostly makes sense if there
+are actually minimum and maximum values in your data set.
+If it's actually Gaussian distribution, the scaling might
+not make a lot of sense, because if you add one more data
+point, it's very far away and it will cram all the other
+data points more together. This will make sense if you have
+a grayscale value between 0 and 255 or something else that
+has like clearly defined boundaries. Another alternative is
+the RobustScaler. It’s the robust version of the
+StandardScaler. It computes the median and the quartiles.
+This cannot be skewed by outliers. The StandardScaler uses
+mean and standard deviation. So if you have a point that’s
+very far away, it can have unlimited influence on the mean.
+The RobustScaler uses robust statistics, so it’s not skewed
+be outliers. The final one is the Normalizer. This projects
+things either on the L1 or L0, meaning it makes sure to
+vectors have length one either in L1 norm or L2 norm. If you
+do this for L2 norm, it means you don't care about the
+length you project on a circle. More commonly used in L1
+norm, it projects onto the diamond. What that does is
+basically it means you make sure the sum of all the entries
+is one. That's often used if you have histograms or if you
+have counts of things. If you want to make sure that you
+have frequency features instead of count features, you can
+use the L1 normalizer.
+
+---
+
+# Scalers (scikit-learn)
+
+- StandardScaler: ensures that for each feature the mean is 0 and the variance is 1, bringing all features to the same magnitude. However, this scaling does not ensure any particular minimum and maximum values for the features. 
+
+- RobustScaler: similar to the StandardScaler, however, it uses the median and quartiles instead of mean and variance. This makes the RobustScaler ignore data points that are very different from the rest (outliers). 
+
+- MinMaxScaler: shifts the data such that all features are exactly between 0 and 1.
+
+- Normalizer : it sprojects a data point on the circle (or sphere) with a radius of 1. This is often used when only the direction (or angle) of the data matters, not the length of the feature vector.
+
+---
+# Standard Scaler Example
+
+```python
+from sklearn.linear_model import Ridge
+X, y = boston.data, boston.target
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, random_state=0)
+
+scaler = StandardScaler()
+scaler.fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+
+ridge = Ridge().fit(X_train_scaled, y_train)
+X_test_scaled = scaler.transform(X_test)
+ridge.score(X_test_scaled, y_test)
+```
+```
+0.634
+```
+
+???
+Here’s how you do the scaling with StandardScaler in
+scikit-learn. Similar interface to models, but“transform”
+instead of “predict”. “transform” is always used when you
+want a new representation of the data.
+
+Fit on training set, transform training set, fit ridge on
+scaled data, transform test data, score scaled test data.
+
+The fit computes mean and standard deviation on the training
+set, transform subtracts the mean and the standard
+deviation.
+
+We fit on the training set and apply transform on both the
+training and the test set. That means the training set mean
+gets subtracted from the test set, not the test-set mean.
+That’s quite important.
+---
+
+
+.center[
+![:scale 100%](images/no_separate_scaling.png)
+]
+
+
+Data Leakage: the scaling should happen inside the cross-validation loop, not outside.
+
+
+Note: Read about pipelines in scikit-learn.
+
+???
+
+Here’s an illustration why this is important using the
+min-max scaler. Left is the original data. Center is what
+happens when we fit on the training set and then transform
+the training and test set using this transformer. The data
+looks exactly the same, but the ticks changed. Now the data
+has a minimum of zero and a maximum of one on the training
+set. That’s not true for the test set, though. No particular
+range is ensured for the test-set. It could even be outside
+of 0 and 1. But the transformation is consistent with the
+transformation on the training set, so the data looks the
+same.
+
+On the right you see what happens when you use the test-set
+minimum and maximum for scaling the test set. That’s what
+would happen if you’d fit again on the test set. Now the
+test set also has minimum at 0 and maximum at 1, but the
+data is totally distorted from what it was before. So don’t
+do that.
+
+---
+class: left, middle
+
+# Discrete features
+
+---
+
+# Categorical Variables
+.smaller[
+```python
+import pandas as pd
+df = pd.DataFrame(
+    {'boro': ['Manhattan', 'Queens', 'Manhattan', 'Brooklyn', 'Brooklyn', 'Bronx'],
+     'vegan': ['No', 'No','No','Yes', 'Yes', 'No']})
+```
+]
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>1</th><td>Queens</td><td>No</td></tr>
+      <tr><th>2</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>3</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>4</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>5</th><td>Bronx</td><td>No</td></tr>
+    </tbody>
+  </table>
+???
+
+Before we can apply a machine learning algorithm, we first
+need to think about how we represent our data.
+
+Earlier, I said x \in R^n. That’s not how you usually get
+data. Often data has units, possibly different units for
+different sensors, it has a mixture of continuous values and
+discrete values, and different measurements might be on
+totally different scales.
+
+First, let me explain how to deal with discrete input
+variables, also known as categorical features. They come up
+in nearly all applications.
+
+Scikit-learn requires you to explicitly handle these, and assumes
+in general that all your input is continuous numbers.
+This is different from how many libraries in R do it,
+which deal with categorical variables implicitly.
+
+---
+# Ordinal encoding
+
+.smaller[
+```python
+df['boro_ordinal'] = df.boro.astype("category").cat.codes
+df
+```
+]
+.left-column[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>boro_ordinal</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>Manhattan</td><td>2</td><td>No</td></tr>
+      <tr><th>1</th><td>Queens</td><td>3</td><td>No</td></tr>
+      <tr><th>2</th><td>Manhattan</td><td>2</td><td>No</td></tr>
+      <tr><th>3</th><td>Brooklyn</td><td>1</td><td>Yes</td></tr>
+      <tr><th>4</th><td>Brooklyn</td><td>1</td><td>Yes</td></tr>
+      <tr><th>5</th><td>Bronx</td><td>0</td><td>No</td></tr>
+    </tbody>
+  </table>
+]
+
+--
+
+.right-column[
+![:scale 100%](images/boro_ordinal.png)
+]
+???
+
+If you encode all three values using the same feature, then
+you are imposing a linear relation between them, and in
+particular you define an order between the categories.
+Usually, there is no semantic ordering of the categories,
+and so we shouldn’t introduce one in our representation of
+the data.
+
+
+---
+# Ordinal encoding
+
+.smaller[
+```python
+df['boro_ordinal'] = df.boro.astype("category").cat.codes
+df
+```
+]
+.left-column[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>boro_ordinal</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>Manhattan</td><td>2</td><td>No</td></tr>
+      <tr><th>1</th><td>Queens</td><td>3</td><td>No</td></tr>
+      <tr><th>2</th><td>Manhattan</td><td>2</td><td>No</td></tr>
+      <tr><th>3</th><td>Brooklyn</td><td>1</td><td>Yes</td></tr>
+      <tr><th>4</th><td>Brooklyn</td><td>1</td><td>Yes</td></tr>
+      <tr><th>5</th><td>Bronx</td><td>0</td><td>No</td></tr>
+    </tbody>
+  </table>
+]
+
+.right-column[
+![:scale 100%](images/boro_ordinal_classification.png)
+]
+
+&nbsp; <br /> &nbsp; <br /> &nbsp; <br /> 
+&nbsp; <br /> &nbsp; <br /> &nbsp; <br />
+&nbsp; <br />  
+
+- If you encode all three values using the same feature, then
+you are imposing a linear relation between them, and in
+particular you define an order between the categories.
+
+???
+
+Usually, there is no semantic ordering of the categories,
+and so we shouldn’t introduce one in our representation of
+the data.
+---
+
+# One-Hot (Dummy) Encoding
+
+.narrow-left-column[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>1</th><td>Queens</td><td>No</td></tr>
+      <tr><th>2</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>3</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>4</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>5</th><td>Bronx</td><td>No</td></tr>
+    </tbody>
+  </table>
+]
+
+.wide-right-column[
+.tiny[
+```python
+pd.get_dummies(df)
+```
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro_Bronx</th><th>boro_Brooklyn</th><th>boro_Manhattan</th><th>boro_Queens</th><th>vegan_No</th><th>vegan_Yes</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>1</th><td>0</td><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+      <tr><th>2</th><td>0</td><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>3</th><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+      <tr><th>4</th><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+      <tr><th>5</th><td>1</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+    </tbody>
+  </table>
+]
+]
+???
+Instead, we add one new feature for each category,
+
+And that feature encodes whether a sample belongs to this
+category or not.
+
+That’s called a one-hot encoding, because only one of the
+three features in this example is active at a time.
+
+You could actually get away with n-1 features, but in
+machine learning that usually doesn’t matter
+
+One way to do is with Pandas. Here I have an example of a
+data frame where I have the boroughs of New York as a
+categorical variable and variable saying whether they are vegan. One to get the
+dummies is to get dummies on this data frame. This will
+create new columns, it will actually replace borough column
+by four columns that correspond to the four different
+values. The get_dummies applies transformation to all
+columns that have a dtype that's either object or
+categorical.
+
+In this case we didn't actually want to transform the target variable vegan.
+
+---
+# One-Hot (Dummy) Encoding
+
+.narrow-left-column[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>1</th><td>Queens</td><td>No</td></tr>
+      <tr><th>2</th><td>Manhattan</td><td>No</td></tr>
+      <tr><th>3</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>4</th><td>Brooklyn</td><td>Yes</td></tr>
+      <tr><th>5</th><td>Bronx</td><td>No</td></tr>
+    </tbody>
+  </table>
+]
+
+.wide-right-column[
+.tiny[
+```python
+pd.get_dummies(df, columns=['boro'])
+```
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>vegan</th><th>boro_Bronx</th><th>boro_Brooklyn</th><th>boro_Manhattan</th><th>boro_Queens</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>No</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>1</th><td>No</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+      <tr><th>2</th><td>No</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>3</th><td>Yes</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>4</th><td>Yes</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>5</th><td>No</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+]
+]
+???
+We can specify selectively which columns to apply the encoding to.
+---
+# One-Hot (Dummy) Encoding
+.narrow-left-column[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>boro</th><th>vegan</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>2</td><td>No</td></tr>
+      <tr><th>1</th><td>3</td><td>No</td></tr>
+      <tr><th>2</th><td>2</td><td>No</td></tr>
+      <tr><th>3</th><td>1</td><td>Yes</td></tr>
+      <tr><th>4</th><td>1</td><td>Yes</td></tr>
+      <tr><th>5</th><td>0</td><td>No</td></tr>
+    </tbody>
+  </table>
+]
+.wide-right-column[
+.tiny[
+
+```python
+pd.get_dummies(df_ordinal, columns=['boro'])
+```
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>vegan</th><th>boro_0</th><th>boro_1</th><th>boro_2</th><th>boro_3</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>No</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>1</th><td>No</td><td>0</td><td>0</td><td>0</td><td>1</td></tr>
+      <tr><th>2</th><td>No</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+      <tr><th>3</th><td>Yes</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>4</th><td>Yes</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>5</th><td>No</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+    </tbody>
+  </table>
+]
+]
+???
+This also helps if the variable was already encoded using integers.
+Sometimes, someone has already encoded the categorical
+variables to integers like here. So here this is exactly the
+same information only except instead of strings you have
+them numbered. If you call the get_dummies on this nothing
+happens because none of them are object data types or
+categorical data types. If you want to look at the One Hot
+Encoding, you can explicitly pass columns equal and this
+will transform into boro_1, boro_2, boro_3.
+In this case get_dummies usually wouldn't do anything, but we can tell
+it which variables are categorical and it will dummy encode those for us.
+---
+class: center, middle
+
+.center[![:scale 50%](images/pandas_dummies3.png)]
+.left-column[![:scale 30%](images/pandas_dummies4.png)]
+.right-column[![:scale 50%](images/pandas_dummies5.png)]
+
+???
+Let's say instead of predicting whether someone is vegan,
+we want to predict their salary.
+That would also be an integer.
+There is no way to a-priory distinguish that one of These
+should be treated as categorical and one as ordinal or continuous.
+
+---
+
+class: center, middle
+
+.center[![:scale 70%](images/pandas_dummies_column_mismatch.png)]
+
+???
+If someone else gives you a new data set and in this new
+data set there is Staten Island, Manhattan, Bronx and
+Brooklyn. So new dataset doesn't have anyone from Queens. So
+now you transform this with get_dummies, you get something
+that has the same shape as the original data but actually,
+the last column means something completely different.
+Because now the last column is Staten Island, not Queens. If
+someone gives you separate training and test data sets, if
+you call get_dummies, you don't know that the columns
+correspond actually to the same thing. Unless you take care
+of the names, unfortunately, scikit-learn completely ignores
+column names.
+---
+class: smaller
+
+#Pandas Categorical Columns
+
+.smaller[
+```python
+import pandas as pd
+df = pd.DataFrame({'salary': [103, 89, 142, 54, 63, 219],
+                   'boro': ['Manhattan', 'Queens', 'Manhattan',
+                            'Brooklyn', 'Brooklyn', 'Bronx']})
+
+df['boro'] = pd.Categorical(df.boro, categories=['Manhattan', 'Queens', 'Brooklyn',
+                                                'Bronx', 'Staten Island'])
+pd.get_dummies(df)
+```
+]
+.tiny[
+<table border="1" class="dataframe">
+    <thead>
+      <tr style="text-align: right;">
+        <th></th><th>salary</th><th>boro_Manhattan</th><th>boro_Queens</th><th>boro_Brooklyn</th><th>boro_Bronx</th><th>boro_Staten Island</th></tr>
+    </thead>
+    <tbody>
+      <tr><th>0</th><td>103</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><th>1</th><td>89</td><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><th>2</th><td>142</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+      <tr><th>3</th><td>54</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>4</th><td>63</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+      <tr><th>5</th><td>219</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+    </tbody>
+  </table>
+]
+
+???
+The way to fix this is by using Pandas categorical types.
+Since we know what the boroughs of Manhattan are, we can
+create Pandas categorical dtype, we can create this
+categorical dtype with the categories Manhattan, Queens,
+Brooklyn, Bronx, and Staten Island. So now I have my column
+here and I'm going to convert it to a categorical dtype. So
+now it will not actually store the strings. It will just
+internally store zero to four, and it will also store what
+are the possible values. If a call get_dummies it will use
+all the possible values and for each of the possible values
+it will create a column. Even though Staten Island has not
+appeared in my dataset, it will still make a column for
+Staten Island. If I fix this categorical dtype I can apply
+it to the training and test data set and that'll make sure
+all the columns are always the same no matter what are the
+values are actually in the data set.
+
+
+---
+class: center, middle
+
+# More encodings for categorical features:
+## http://contrib.scikit-learn.org/categorical-encoding/
+---
+
+
+
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+    <script>
+    // Config Remark
+    remark.macros['scale'] = function (percentage) {
+        var url = this;
+        return '<img src="' + url + '" style="width: ' + percentage + '" />';
+    };
+    config_remark = {
+        highlightStyle: 'magula',
+        highlightSpans: true,
+        highlightLines: true,
+        ratio: "16:9"
+    };
+      var slideshow = remark.create(config_remark);
+    // Configure MathJax
+    MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'] /* removed 'code' entry*/
+    }
+    });
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i = 0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+    </script>
+  </body>
+</html>
