@@ -15,4 +15,4 @@ Assignments:
 
 Slides:
 
-* Machine Learning Slides: Slides from the ML subject. Those slides are based on the COMS W4495 ([Applied Machine Learning, Andreas Müller](https://github.com/amueller/COMS4995-s19)) slides. There are two versions: PDF and HTML (press `p` for notes). 
+* Machine Learning Slides: Slides from the ML subject. These slides are based on the COMS W4495 ([Applied Machine Learning, Andreas Müller](https://github.com/amueller/COMS4995-s19)) slides. There are two versions: PDF and HTML (press `p` for notes). 
