@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Model Evaluation</title>
+    <meta charset="utf-8">
+        <style>
+       @import url(https://fonts.googleapis.com/css?family=Garamond);
+       @import url(https://fonts.googleapis.com/css?family=Muli:400,700,400italic);
+       @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+     </style>
+     <link rel="stylesheet" href="../style.css">
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+### W4995 Applied Machine Learning
+
+# Model evaluation
+
+02/25/19
+
+Andreas C. Müller
+
+(Adapted and modified for CC 6021236 @ PCC/Ciencias/UCV by 
+
+Eugenio Scalise, October 2019)
+
+
+
+???
+FIXME macro vs weighted average example
+FIXME balanced accuracy - explain both?
+FIXME roc auc not good for imbalanced!? show example!!
+
+FIXME remove regression, go into more depth on cost-sensitive?
+FIXME relate to calibration!
+FIXME How to pick thresholds in multi-class?
+FIXME Add log-loss to metrics, and show why I don’t like it (.4, .6, 0) is better than (.36, .34, .3)
+FIXME explain why ROC AUC doesn't depend on class imbalance by calculating example
+FIXME write down example on slide about recall being zero and AUC being 1?
+
+
+---
+class: centre,middle
+# Metrics for Binary Classification
+???
+
+
+---
+
+# Review : confusion matrix
+.center[
+![:scale 75%](images/confusion_matrix.png)
+]
+
+
+???
+Diagonal divided by everything.
+
+---
+# 
+.smaller[
+```python
+from sklearn.datasets import load_breast_cancer
+from sklearn.linear_model import LogisticRegression
+data = load_breast_cancer()
+
+X_train, X_test, y_train, y_test = train_test_split(
+    data.data, data.target, stratify=data.target, random_state=0)
+
+lr = LogisticRegression().fit(X_train, y_train)
+y_pred = lr.predict(X_test)
+
+from sklearn.metrics import confusion_matrix
+print(confusion_matrix(y_test, y_pred))
+print(lr.score(X_test, y_test))
+```
+]
+
+![:scale 20%](images/breast_cancer_cf_matrix.png)
+---
+# Problems with Accuracy
+Data with 90% positives:
+.smaller[
+```python
+from sklearn.metrics import accuracy_score
+for y_pred in [y_pred_1, y_pred_2, y_pred_3]:
+    print(accuracy_score(y_true, y_pred))
+```
+```
+0.9
+0.9
+0.9
+```
+]
+.center[
+![:scale 70%](images/problems_with_accuracy.png)
+]
+???
+- Imbalanced classes lead to hard-to-interpret accuracy.
+
+---
+class:split-40
+# Precision, Recall, f-score
+.left-column[
+`$$ \large\text{Precision} = \frac{\text{TP}}{\text{TP}+\text{FP}}$$`<br />
+`$$\large\text{Recall} = \frac{\text{TP}}{\text{TP}+\text{FN}}$$`<br />
+`$$\large\text{F} = 2 \frac{\text{precision} \cdot\text{recall}}{\text{precision}+\text{recall}}$$`]
+.right-column[
+<br />
+Positive Predicted Value (PPV), 
+<br /> 
+[Precisión]<br /> 
+<br /> 
+<br />
+Sensitivity, coverage, true positive rate.
+<br /> 
+[Exhaustividad]<br /> 
+<br /> 
+<br />
+Harmonic mean of precision and recall (F1-score)
+]
+???
+All depend on definition of positive and negative.
+---
+class:spacious
+# Precision, Recall, FPR
+- Precision: what fraction of positive predictions are correct?
+- Recall (True Positive Rate, sensitivity, probability of detection): what fraction of all positive instances does the classifier correctly identify as positive?
+- False Positive Rate (Specificity): what fraction of all negative instances does the classifier incorrectly identify as positive.
+
+`$$ \large\text{FPR} = \frac{\text{FP}}{\text{TN}+\text{FP}}$$`<br />
+
+???
+
+---
+# Tradeoff between precision and recall
+
+- Recall-oriented machine learning tasks:
+  * Search and information extraction in legal discovery
+  * Tumor detection
+  * Often paired with a human expert to filter out false positives
+- Precision-oriented machine learning tasks:
+  * Sarch engine ranking, query suggestion
+  * Document classification
+  * Many customer-facing tasks (users remember failures!)
+
+???
+
+---
+class: center, spacious
+# The Zoo
+![:scale 100%](images/zoo.png)
+
+https://en.wikipedia.org/wiki/Precision_and_recall
+???
+---
+
+class:split-40
+.left-column[
+![:scale 50%](images/confusion_matrix_col.png)]
+.right-column[
+<br />
+![:scale 100%](images/classification_report_1.png)
+<br />
+<br />
+![:scale 100%](images/classification_report_2.png)
+<br />
+<br />
+![:scale 100%](images/classification_report_3.png)
+]
+???
+---
+class:spacious
+# Goal setting!
+- What do I want? What do I care about? 
+- Can I assign costs to the confusion matrix? (i.e. a false positive costs me 10 dollars; a false negative, 100 dollars)
+- What guarantees do we want to give?
+
+???
+(precision, recall, or something else)
+(i.e. a false positive costs me 10 dollars; a false negative, 100 dollars)
+---
+# Changing Thresholds
+.tiny-code[
+```python
+data = load_breast_cancer()
+
+X_train, X_test, y_train, y_test = train_test_split(
+    data.data, data.target, stratify=data.target, random_state=0)
+
+lr = LogisticRegression().fit(X_train, y_train)
+y_pred = lr.predict(X_test)
+
+print(classification_report(y_test, y_pred))
+```
+```
+          precision   recall  f1-score  support
+0              0.91     0.92      0.92       53  
+1              0.96     0.94      0.95       90
+avg/total      0.94     0.94      0.94      143
+```
+```python
+y_pred = lr.predict_proba(X_test)[:, 1] > .85
+
+print(classification_report(y_test, y_pred))
+```
+```
+          precision   recall  f1-score  support
+0              0.84     1.00      0.91       53  
+1              1.00     0.89      0.94       90
+avg/total      0.94     0.93      0.93      143
+
+```
+]
+
+
+???
+---
+# Precision-Recall curve
+```python
+X, y = make_blobs(n_samples=(2500, 500), cluster_std=[7.0, 2],
+                  random_state=22)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y)
+
+svc = SVC(gamma=.05).fit(X_train, y_train)
+
+precision, recall, thresholds = precision_recall_curve(
+    y_test, svc.decision_function(X_test))
+```
+
+???
+---
+# Precision-Recall curve
+.center[
+![:scale 75%](images/precision_recall_curve.png)
+]
+???
+---
+# F1 vs average Precision
+.smaller[
+```python
+from sklearn.metrics import f1_score
+print("f1_score of random forest: {:.3f}".format(
+      f1_score(y_test, rf.predict(X_test))))
+print("f1_score of svc: {:.3f}".format(f1_score(y_test, svc.predict(X_test))))
+```
+
+```
+f1_score of random forest: 0.709
+f1_score of svc: 0.715
+```
+```python
+from sklearn.metrics import average_precision_score
+ap_rf = average_precision_score(y_test, rf.predict_proba(X_test)[:, 1])
+ap_svc = average_precision_score(y_test, svc.decision_function(X_test))
+print("Average precision of random forest: {:.3f}".format(ap_rf))
+print("Average precision of svc: {:.3f}".format(ap_svc))
+```
+```
+Average precision of random forest: 0.682
+Average precision of svc: 0.693
+```
+]
+???
+Previously, I just have sort of a simple comparison between
+f1 and average precision. I'm comparing these two models. So
+if I look at f1 score, it's going to compare basically these
+two points and the SVC is slightly is better.
+
+But F1 score only looks at the default threshold. If I want
+to look at the whole RC curve, I can use average precision.
+Even if I look at all possible thresholds, SVC is still
+better. Average precision is sort of a very sensitive metric
+that allows you to basically make good decisions even if the
+classes are very imbalanced and that also takes all possible
+thresholds into account. 
+
+One thing that you should keep in mind if you use this is
+that this does not give you a particular threshold. For
+example, if you use the default threshold, your accuracy
+might be zero. This only looks at ranking. 
+
+The curve and the area under the curve, don't depend on
+where the default threshold is. So if you predict
+everything, like for some weird reason, if you predict
+everything as the minority class, your accuracy will be
+really bad. But if they are ranked in the right order, so
+that all the positive classes are ranked higher than the
+negative classes, then you might still get an area under the
+curve that's very close to one. So this only looks at
+ranking. 
+
+
+AP only considers ranking!
+---
+
+# ROC Curve
+.center[
+![:scale 100%](images/zoo.png)
+]
+`$$ \text{FPR} = \frac{\text{FP}}{\text{FP}+\text{TN}}$$`
+`$$ \text{TPR} = \frac{\text{TP}}{\text{TP}+\text{FN}} = \text{recall}$$`
+???
+Another very commonly used measure is the ROC curve. It's
+similar to the precision-recall curve. But now you're
+looking the false positive rate and the true positive rate.
+True positive rate is just another name for recall, which is
+true positives divided by true positives plus false
+positives. So of ones that are actually true, how many did I
+get? 
+
+False positive rate is false positives divided by false
+positives plus true negatives. So of everything that's
+predicted as negative, how many of those were wrongly
+predicted as negative.
+
+---
+.center[
+![:scale 75%](images/roc_curve.png)
+]
+???
+You can look at this for all possible thresholds. Again, you
+get a curve. Here is the curve for support vector machine
+and random forest again. With the same classifier. And
+again, the thresholds look pretty arbitrary. 
+
+It might be a little bit hard to say which one is better?
+For the precision-recall curve, the optimum was in the top
+right, you want to be in as top right as possible. So you
+want to have a recall of one and the precision of one. 
+
+For the ROC curve, the ideal point is the top left. You want
+a false positive rate of zero and a true positive rate of
+one. One thing that's kind of nice for the ROC curve is that
+no matter what the class imbalances are, the random
+classifier or classifier that predicts everything as the
+same class will be diagonal. 
+
+
+---
+# ROC AUC
+- Area under ROC Curve
+- Always .5 for random/constant prediction
+.tiny-code[
+```python
+from sklearn.metrics import roc_auc_score
+rf_auc = roc_auc_score(y_test, rf.predict_proba(X_test)[:,1])
+svc_auc = roc_auc_score(y_test, svc.decision_function(X_test))
+print("AUC for random forest: {:, .3f}".format(rf_auc))
+print("AUC for SVC: {:, .3f}".format(svc_auc))
+```
+
+```
+AUC for random forest: 0.937
+AUC for SVC: 0.916
+```
+]
+The Relationship Between Precision-Recall and ROC Curves
+<br />
+https://www.biostat.wisc.edu/~page/rocpr.pdf
+???
+And so when you look at the area under the curve, which is
+called ROC AUC, it's always 0.5 for random or constant
+predictions. So it's very easy to say, how much better than
+random are you if you look at ROC AUC. 
+
+I encourage you to read the paper in the link. 
+
+One thing is that the ROC curve is usually much smoother and
+it makes more sense to interpolate it, where the
+precision-recall curve makes less sense to interpolate us.
+But the precision-recall curve can sometimes pick up on more
+fine-grained differences. 
+
+Even though AUC stands for area under the curve, if you see
+it in literature always means the area under the receiver
+operating curve. So AUC always means ROC AUC. 
+
+AUC is a ranking metric. So it takes all possible thresholds
+into account, which means that it's independent of the
+default thresholds. So again, you can have something with
+very low accuracy but still with perfect ROC AUC. 
+
+
+---
+
+# Summary of metrics for binary classification
+
+Threshold-based:
+- accuracy
+- precision, recall, f1
+
+Ranking:
+- average precision
+- ROC AUC
+
+???
+So let's briefly summarize the metrics for binary
+classification. So there are basically two approaches. One
+looks just at the predictions or look at soft predictions
+and take multiple thresholds into account. So the ones that
+I called threshold base, which is for single threshold, the
+ones that we talked about in our accuracy, which is just a
+fraction of correctly predicted, precision, recall, and f1.
+So the issue with accuracy is obviously that it can't
+distinguish between things that are quite different, for
+example, for imbalanced data sets, the classifier always
+predicts majority class often has like very high accuracy
+but tells you nothing. So in particular, for imbalanced
+classes, accuracy is a pretty bad measure. Precision and
+recall together are pretty good measures, though you always
+need to look at both numbers. One way to look at both
+numbers at once is the f1 score, though, using the harmonic
+mean is a little bit arbitrary. But still, only f1 score is
+a somewhat reasonable score if you only look at the actual
+predicted classes.
+
+For the ranking based losses, I think both average precision
+and ROC AUC are pretty good choices, ROC AUC, I like it
+because I know what 0.5 means, while for average precision,
+it's a little bit more tricky to see what the different
+orders of magnitude mean, or the different scales mean, but
+it can be more fine-grained measure. And so if you want to
+do cross-validation, my go-to is usually ROC AUC. In
+particular, for imbalance binary datasets, I would usually
+use ROC AUC. But then make sure that your threshold is
+sensible, but anything other than accuracy is okay. 
+
+Just don’t look at only precision or only recall, if you do
+a grid search for just precision, you will probably get
+garbage results. 
+
+
+add log loss?
+---
+class: centre,middle
+# Multi-class classification
+???
+The next thing I want to talk about is multiclass
+classification.
+---
+class:split-40
+#Confusion Matrix
+.left-column[
+.tiny-code[
+```python
+from sklearn.datasets import load_digits
+from sklearn.metrics import accuracy_score
+
+digits = load_digits()
+ # data is between 0 and 16
+X_train, X_test, y_train, y_test = train_test_split(
+    digits.data / 16., digits.target, random_state=0)
+lr = LogisticRegression().fit(X_train, y_train)
+pred = lr.predict(X_test)
+print("Accuracy: {:.3f}".format(accuracy_score(y_test, pred)))
+print("Confusion matrix:")
+print(confusion_matrix(y_test, pred))
+```
+```
+Accuracy: 0.964
+Confusion matrix:
+[[37  0  0  0  0  0  0  0  0  0]
+ [ 0 41  0  0  0  0  1  0  1  0]
+ [ 0  0 44  0  0  0  0  0  0  0]
+ [ 0  0  0 43  0  0  0  0  1  1]
+ [ 0  0  0  0 37  0  0  1  0  0]
+ [ 0  0  0  0  0 47  0  0  0  1]
+ [ 0  1  0  0  0  0 51  0  0  0]
+ [ 0  0  0  0  1  0  0 47  0  0]
+ [ 0  3  1  0  0  1  0  0 43  0]
+ [ 0  0  0  0  0  2  0  0  1 44]]
+```
+]
+]
+.right-column[
+.tiny-code[
+```python
+print(classification_report(y_test, pred))
+```
+```
+             precision    recall  f1-score   support
+
+          0       1.00      1.00      1.00        37
+          1       0.91      0.95      0.93        43
+          2       0.98      1.00      0.99        44
+          3       1.00      0.96      0.98        45
+          4       0.97      0.97      0.97        38
+          5       0.94      0.98      0.96        48
+          6       0.98      0.98      0.98        52
+          7       0.98      0.98      0.98        48
+          8       0.93      0.90      0.91        48
+          9       0.96      0.94      0.95        47
+
+avg / total       0.96      0.96      0.96       450
+```
+]
+]
+
+<br />
+<br />
+Note: read about "micro" and "macro" average.
+???
+So again, for multiclass classification, you look at the
+confusion matrix. It's even more telling in a way than it
+was for binary classification but it's also pretty big. So
+here, I'm using the digital data set, which has 10 classes,
+and here's the confusion matrix. The diagonal is everything
+that's correct, the off-diagonal are mistakes. 
+
+And you can see very fine-grained which classes were
+mistaken for which other classes. So this is very nice if
+you want to look in a very detailed view of the performance
+of the classifier. But again, you can't really use it for
+model selection, or not easily. You can also again, look at
+the classification report, which will give you
+precision-recall and F score for each for the classes,
+again, very, very fine grained. So you can see, for example,
+that Class 0, was predicted while Class 8 is the hardest. 
+
+It might make more sense to look at in precision average
+classes, recall over the classes or f1 score for the
+classes. 
+
+---
+
+class: middle
+# Using metrics
+
+???
+In summary, for both multiclass and binary, you should
+really think about what your metrics are. And unless your
+problem is balanced, and even maybe then don't use accuracy.
+Accuracy is really bad. Problems are rarely balanced, in a
+real world and usually there heavily unbalanced unless
+someone artificially balances them. So it's really important
+to think about what is the right criterion for a particular
+task, and then you can optimize that criterion. 
+
+So as I said, that can be like having costs associated with
+the confusion matrix, emphasizing precision or recall,
+setting specific goals such as have recall of at least X
+percent, or have precision of at least X percent and for
+multi-class deciding whether are all the classes the same
+importance, or all the samples the same importance, what are
+the important classes, even for binary, which one is the
+positive class? 
+
+So whenever you talk about precision and recall, it’s
+important to think about which one is the positive class and
+how will changing the positive class change these two
+values? So and then finally, obviously, am I going to use
+the default threshold? Why am I going to use the default
+threshold? Do I use a ranking based metric? Or is there a
+reason why I would want to use a ranking based metric?
+
+
+- Accuracy rarely what you want
+- Problems are rarely balanced
+- Find the right criterion for the task
+- OR pick one arbitrarily, but at least think about it
+- Emphasis on recall or precision?
+- Which classes are the important ones?
+---
+# Using metrics in cross-validation
+.smaller[
+```python
+X, y = make_blobs(n_samples=(2500, 500), cluster_std=[7.0, 2],
+                  random_state=22)
+
+# default scoring for classification is accuracy
+scores_default = cross_val_score(SVC(), X, y)
+
+# providing scoring="accuracy" doesn't change the results
+explicit_accuracy =  cross_val_score(SVC(), X, y, scoring="accuracy")
+
+# using ROC AUC
+roc_auc =  cross_val_score(SVC(), X, y, scoring="roc_auc")
+
+print("Default scoring:", scores_default)
+print("Explicit accuracy scoring:", explicit_accuracy)
+print("AUC scoring:", roc_auc)
+```
+```
+Default scoring: [ 0.92   0.904  0.913]
+Explicit accuracy scoring: [ 0.92   0.904  0.913]
+AUC scoring: [ 0.93   0.885  0.923]
+```
+]
+
+???
+So once you pick them, it's very easy to use any of these
+metrics in scikit-learn. So they're all functions inside the
+metrics module, but usually, you're going to want to use
+them in for cross-validation, or grid search. And then it's
+even easier. There's argument called scoring. It takes a
+string or a callable. And so here, if you give it a string,
+it'll just do the right thing automatically.
+
+By default its accuracy. So if you don't do anything, it's
+the same as if you provide accuracy. But you can also set
+ROC AUC, and it's going to use ROC AUC. So the thing is ROC
+AUC actually needs probabilities right or a decision
+function, so behind the scenes, it does the right thing and
+gets out the decision function for the positive class to
+compute the ROC AUC correctly.
+
+Using better a metric than accuracy is as simple as saying
+scoring equal to something. And it’s exactly the same as in
+grid search CV. So if you want to do a grid search CV or
+randomized search CV, you can set scoring equal to ROC AUC
+or average precision or recall macro.
+
+
+Same for GridSearchCV
+<br />
+Will make GridSearchCV.score use your metric!
+
+---
+# Built-in scoring
+```python
+from sklearn.metrics.scorer import SCORERS
+print("\n".join(sorted(SCORERS.keys())))
+```
+.smaller[
+```
+print("\n".join(sorted(SCORERS.keys())))
+accuracy                       adjusted_mutual_info_score     adjusted_rand_score            
+average_precision              balanced_accuracy              brier_score_loss               
+completeness_score             explained_variance             f1                             
+f1_macro                       f1_micro                       f1_samples                     
+f1_weighted                    fowlkes_mallows_score          homogeneity_score              
+max_error                      mutual_info_score              neg_log_loss                   
+neg_mean_absolute_error        neg_mean_squared_error         neg_mean_squared_log_error     
+neg_median_absolute_error      normalized_mutual_info_score   precision                      
+precision_macro                precision_micro                precision_samples              
+precision_weighted             r2                             recall                         
+recall_macro                   recall_micro                   recall_samples                 
+recall_weighted                roc_auc                        v_measure_score 
+```
+]
+
+
+???
+Here's a list of all the built-in scores, you can look at
+the documentation, there's really a lot of them. So these
+are for classification or regression or clustering. If you
+look in the documentation, you'll actually see which ones
+are for classification, which one is binary only, which ones
+are multiclass, which ones are regression and which ones are
+for clustering.
+
+The thing in scikit-learn, whatever you use for scoring
+greater needs to be better the way it's written. So you
+can’t use mean_squared_error for doing a grid search,
+because the grid search assumes greater is better so you
+have to use negative mean squared error. So for regression
+or log loss, you use mean squared error. For classification,
+you need to use the neg log loss one.
+
+---
+class: center, middle
+
+# Questions ?
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+    <script>
+    // Config Remark
+    remark.macros['scale'] = function (percentage) {
+        var url = this;
+        return '<img src="' + url + '" style="width: ' + percentage + '" />';
+    };
+    config_remark = {
+        highlightStyle: 'magula',
+        highlightSpans: true,
+        highlightLines: true,
+        ratio: "16:9"
+    };
+      var slideshow = remark.create(config_remark);
+    // Configure MathJax
+    MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'] /* removed 'code' entry*/
+    }
+    });
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i = 0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+    </script>
+  </body>
+</html>
