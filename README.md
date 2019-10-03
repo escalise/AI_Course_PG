@@ -12,6 +12,8 @@ Assignments:
 
 * `IA-2019-1_-_Tarea_1_-_Busqueda.ipynb`: Assignment 1, A* search.
 * `IA-2019-1_-_Tarea_2_-_AlgoritmosGeneticos.ipynb`: Assignment 2, Genetic Algortithms.
+* `IA-2019-1_-_Tarea_3_-_AprendizajeSupervizado.ipynb`: Assignment 3, Supervized Learning (Binary Classification).
+
 
 Slides:
 
