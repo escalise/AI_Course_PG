@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dimensionality Reduction</title>
+    <meta charset="utf-8">
+        <style>
+       @import url(https://fonts.googleapis.com/css?family=Garamond);
+       @import url(https://fonts.googleapis.com/css?family=Muli:400,700,400italic);
+       @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+     </style>
+     <link rel="stylesheet" href="../style.css">
+  </head>
+  <body>
+    <textarea id="source">
+
+class: center, middle
+
+### W4995 Applied Machine Learning
+
+# Dimensionality Reduction
+
+## (PCA)
+
+03/25/19
+
+Andreas C. Müller
+
+(Adapted and modified for CC 6021236 @ PCC/Ciencias/UCV by 
+
+Eugenio Scalise, October 2019)
+
+???
+Today we're going to talk about dimensionality reduction,
+mostly about principal component analysis. We're also going
+to talk about discriminant analysis and manifold learning.
+
+These all slightly different sets of goals. But the main
+idea here is to take a high dimensional input dataset and
+produce the dimensionality for processing. It can be either
+before the machine learning pipeline or often for
+visualization.
+
+
+FIXME PCA components and scaling: xlabel for components 0 and 1
+FIXME LDA projection slide with explanation and diagram!
+FIXME compare Largevis, t-SNE, UMAP
+FIXME print output in PCA slides: I need to know the dimenionality (29?)
+FIXME trim tsne animation
+FIXME write down math for inverse transform? (and for pca transform?)
+FIXME show unwhitened vs whitened plot
+---
+class: centre,middle
+# Unsupervized Learning
+???
+---
+# Unsupervized Learning
+
+- Unsupervised learning subsumes all kinds of machine learning where there is no known output, no teacher to instruct the learning algorithm.
+
+- Unsupervised learning involves tasks that operate on datasets without labeled responses or target values
+
+- The learning algorithm is just shown the input data and asked to extract knowledge from this data.
+
+- We will look into two kinds of unsupervised learning in this course: __transformations of the dataset__ (i.e. dimensionality reduction) and __clustering__.
+
+???
+---
+# Applications of Unsupervized Learning
+
+- Visualize structure of a complex dataset.
+
+- Density estimation to predict probabilities of events. 
+
+- Compress and summarize the data.
+
+- Extract features for supervised learning.
+
+- Discover important clusters or outliers.
+???
+---
+# Principal Component Analysis (PCA)
+
+- PCA finds the directions of the maximum variant in the data.
+
+- PCA returns an orthogonal basis of the space where the components are ordered by how much variance of the data they cover and so we get a new basis of the original space.
+
+- This new basis corresponds to rotating the input space (in the example the first component is my X-axis and the second component is my Y-axis and this is the transformation that PCA learns).
+
+- We can use PCA for dimensionality reduction dropping some of the dimensions (they are ordered by decreasing variance).
+
+- The idea is that does a PCA projection covers as much as possible of the data set.
+
+- You can also look at PCA as a de-noising algorithm.
+???
+---
+.center[
+![:scale 70%](images/pca-intuition.png)
+]
+
+???
+Here, we have a 2D input space, there's some point scattered
+here. The color is supposed to show you where the data goes
+in the transformations. PCA finds the directions of the
+maximum variant in the data.
+
+So starting with this blob of data, you look at the
+direction that is the most elongated. And then you look for
+the next opponent that captures the second most various,
+that's orthogonal to the first component. Here in
+2-dimensions, there's only one possibility to be orthogonal
+to the first component and so that's our second component.
+
+If you're in higher dimensions, there are obviously
+infinitely many different directions that could be
+orthogonal, and so then you would iterate.
+
+What PCA returns is basically an orthogonal basis of the
+space where the components are ordered by how much variance
+of the data they cover and so we get a new basis of the
+original space. So we can do this until like N dimensions
+many times. In this example, I could do two times, after
+that there are no orthogonal vectors left.
+
+And so this new basis corresponds to rotating the input
+space, I can rotate the input space so that the first
+component is my X-axis and the second component is my Y-axis
+and this is the transformation that PCA learns.
+
+This doesn't do any dimensionality reduction as of yet, this
+is just a rotation of the input space. If I want to use it
+for dimensionality reduction, I can now start dropping some
+of these dimensions. So they are ordered by decreasing
+variance, I could in this example drop, for example, the
+second component only to regain the first component.
+
+So basically, I dropped the Y-axis and projected everything
+to the X line. And this would be dimensionality reduction
+with the PCA going from two dimensions to one dimension. And
+the idea is that if your data lives on a lower dimensional
+space, or essentially lives on lower dimensional space,
+embedded in high dimensional space, you could think of this
+is mostly aligned or Gaussian blob along this direction and
+there's a little bit of noise in this direction. The most
+information about the data is sort of along this line.
+
+The idea is that does one-dimensional projection now covers
+as much as possible of this data set.
+
+You can also look at PCA as being sort of a de-noising
+algorithm, by taking this reduced representation in the
+rotated space and rotating it back to the original space. So
+this is basically transforming the data using PCA, the
+rotation dropping one dimension rotating back, you end up
+with this. And so this is through information that is
+retained in this projection, basically. And so, arguably,
+you still have a lot of information from this dataset.
+
+---
+# PCA Computation
+- Center X (subtract mean).
+- In practice: Also scale.
+- Compute singular value decomposition (SVD):
+![:scale 100%](images/pca-computation.png)
+???
+If I want to apply PCA to my dataset, the first thing I have
+to do, which is sort of part of the algorithm subtracts the
+mean. Any package will subtract the mean for you before it
+does the SVD. What you should probably also do in practice
+is to scale the data to unit variance.
+
+And then the PCA algorithm just computes the singular level
+decomposition.
+
+We decompose the data X into an orthogonal, a diagonal, and
+an orthogonal. V^T is number of features, U is number of
+samples times number of samples, D is diagonal containing
+singular values. Singular values correspond to the variance
+of each of these directions. Usually, in SVD you sort them
+by singular values. So the largest singular value
+corresponds to the first principle components.
+
+There's an additional processing step that you can do which
+is the most basic form of PCA. You can also use these
+entries of the diagonal to really scale the data in the
+rotated space so that the variance is the same across each
+of the new dimensions.
+
+
+---
+class: split-40
+# PCA for Visualization
+.tiny-code.left-column[```python
+from sklearn.decomposition import PCA
+print(cancer.data.shape)
+pca = PCA(n_components=2)
+X_pca = pca.fit_transform(cancer.data)
+print(X_pca.shape)
+plt.scatter(X_pca[:, 0], X_pca[:, 1], c=cancer.target)
+plt.xlabel("first principal component")
+plt.ylabel("second principal component")
+components = pca.components_
+plt.imshow(components.T)
+plt.yticks(range(len(cancer.feature_names)), cancer.feature_names)
+plt.colorbar()
+```
+![:scale 80%](images/pca-for-visualization-cancer-data.png)
+]
+.right-column[
+![:scale 90%](images/pca-for-visualization-components-color-bar.png)]
+???
+I want to show you an example on real data set. So the first
+data set I'm going to use it on is the breast cancer data
+set.
+
+The way I use PCA most often is probably for visualization.
+I often do PCA with two components, because my monitor has
+two dimensions.
+
+I fit, transform the data and I scatter it and then I get
+the scatter plot of the first principle component versus
+second principal component. So this is the binary
+classification problem, PCA obviously is a completely
+unsupervised method, so it doesn't know what the class
+labels but I could look whether this is a hard problem to
+solve or is it an easy problem to solve. If I look at this
+plot, maybe it looks like it's a relatively easy problem to
+solve with the points being relatively well separated.
+
+Now I look at the principal component vectors. So there are
+two principal components, each of them has number of
+features many dimensions. So this is shown here as a heat
+map. And you can see that there are basically two features
+that dominate the principal components, which is mean area
+and worst area. And all the rest of the entries are
+approximately zero. So actually, I didn't rotate my data at
+all, I just looked at two features.
+
+So I didn't scale my data, if I don't scale my data and a
+particular feature has a much larger magnitude, this feature
+will basically be the first principle component because if I
+multiply a feature by 10,000, this feature will have the
+largest variance of everything. There will be no direction
+that has a larger variance than that.
+
+---
+class:spacious
+# Scaling!
+.tiny-code[```python
+pca_scaled = make_pipeline(StandardScaler(), PCA(n_components=2))
+X_pca_scaled = pca_scaled.fit_transform(cancer.data)
+plt.scatter(X_pca_scaled[:, 0], X_pca_scaled[:, 1], c=cancer.target, alpha=.9)
+plt.xlabel("first principal component")
+plt.ylabel("second principal component")
+```]
+.center[![:scale 45%](images/scaled-pca-for-visualization-cancer-data.png)]
+???
+So now I scale the data. And then I get two components on
+the cancer data set. And now actually the data looks even
+better separated. Even with this unsupervised methods it
+very clearly shows me what separation of the classes is, I
+can also see things like the yellow class looks much denser
+than the purple class, maybe there are some outliers here,
+but this definitely gives me a good idea of this dataset.
+
+So this is much more compact than looking at a 30x30 scatter
+matrix, which I couldn't comprehend. So we can look at the
+components again.
+
+
+
+Imagine one feature with very large scale. Without scaling,
+it’s guaranteed to be the first principal component!
+---
+class:split-40
+# Inspecting components
+.tiny-code[```python
+components = pca_scaled.named_steps['pca'].components_
+plt.imshow(components.T)
+plt.yticks(range(len(cancer.feature_names)), cancer.feature_names)
+plt.colorbar()
+```]
+.smaller.left-column[
+![:scale 70%](images/inspecting-pca-scaled-components.png)
+]
+
+.right-column[
+![:scale 100%](images/inspecting-pca-scaled-components-2.png)]
+
+???
+So components are stored in the components attribute of the
+PCA class. And you can see now all of the features
+contribute to the principal components.
+
+And if you're an expert in the area, and you know what these
+features mean, sometimes it's possible to read something in
+this. It's definitely helpful often to look at these
+component vectors.
+
+Another way to visualize the component vectors is to do a
+scatter plot. But that only works basically for the first
+two principal components. So you can basically look at the
+positions of the original features, each dot here is one of
+the original features, and you can look at how much does
+this feature contribute to principal component one versus
+principal component two. And so I can see that the second
+principal component is dominated by mean fractal dimension
+and the first personal component is dominated by the worst
+perimeter. And worse perimeter negatively contributes to the
+second principal component. And worst case point is also
+very strong in the first principle component but has zero in
+the second principal component.
+
+This was sort of the first approach trying to use PCA for
+2-dimensional visualization and trying to understand what
+the components mean.
+
+sign of component is meaningless!
+---
+# PCA for regularization
+.tiny-code[
+```python
+from sklearn.linear_model import LogisticRegression
+X_train, X_test, y_train, y_test = train_test_split(cancer.data, cancer.target, stratify=cancer.target, random_state=0)
+lr = LogisticRegression(C=10000).fit(X_train, y_train)
+print(lr.score(X_train, y_train))
+print(lr.score(X_test, y_test))
+```
+```
+0.993
+0.944
+```
+```python
+pca_lr = make_pipeline(StandardScaler(), PCA(n_components=2), LogisticRegression(C=10000))
+pca_lr.fit(X_train, y_train)
+print(pca_lr.score(X_train, y_train))
+print(pca_lr.score(X_test, y_test))
+```
+```
+0.961
+0.923
+```
+]
+???
+One thing that PCA is often used for, in particular for
+statistics oriented people, is using it for regularizing a
+model. You can use PCA to reduce the dimensionality of your
+data set and then you can do a model on the on the reduced
+dimensional data set. Since it has fewer features, this will
+have less complexity, less power so you can avoid
+overfitting by reducing the dimensionality.
+
+I’ve given an example here on the same data set. I'm using
+logistic regression, and I basically turn off
+regularization. Instead of using L2 regularization in linear
+regression, I'm trying to do reduce the input space.
+
+So you can see that, if I do that, I basically overfit the
+data perfectly. So on the training dataset, I have 99.3%
+accuracy, and on test dataset I have 44.4% accuracy.
+
+Now if I use PCA with two dimensions, I reduce this down to
+just two features. I basically reduce overfitting a lot so I
+get a lower training score but I also get a lower test
+score.
+
+Generally, if you find that you only need 2-dimension to
+solve a problem, then that’s a very simple problem. But if
+you're shooting for accuracy, clearly you’ve regularized too
+much, you're restricted to the model too much by just using
+two components. One way to figure out a good number of
+components, obviously, doing grid search with
+cross-validation. Another way is to look at the variance
+that it is covered by each of the components, so this is
+basically the singular values.
+---
+# Summary
+- PCA good for visualization, exploring correlations
+- PCA can sometimes help with classification as regularization or for feature extraction.
+- Check LDA and t-SNE: a supervised alternative to PCA.
+???
+PCA, I really like for visualization and for exploring
+correlations, you can use it together with a classification
+for regularization if you have lots of features. Often, I
+find that regularization of the classifier works better.
+
+T-SNE probably makes the nicest pictures of the bunch.
+
+And if you want a linear transformation of your data in a
+supervised setting Linear Discriminant Analysis is a good
+alternative to PCA.
+
+LDA also  also yields a rotation of the input spacA
+---
+class: center, middle
+
+# Next: Clustering
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+    <script>
+    // Config Remark
+    remark.macros['scale'] = function (percentage) {
+        var url = this;
+        return '<img src="' + url + '" style="width: ' + percentage + '" />';
+    };
+    config_remark = {
+        highlightStyle: 'magula',
+        highlightSpans: true,
+        highlightLines: true,
+        ratio: "16:9"
+    };
+      var slideshow = remark.create(config_remark);
+    // Configure MathJax
+    MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'] /* removed 'code' entry*/
+    }
+    });
+    MathJax.Hub.Queue(function() {
+        var all = MathJax.Hub.getAllJax(), i;
+        for(i = 0; i < all.length; i += 1) {
+            all[i].SourceElement().parentNode.className += ' has-jax';
+        }
+    });
+    </script>
+  </body>
+</html>
