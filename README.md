@@ -17,4 +17,8 @@ Assignments:
 
 Slides:
 
-* Machine Learning Slides: Slides from the ML subject. These slides are based on the COMS W4495 ([Applied Machine Learning, Andreas Müller](https://github.com/amueller/COMS4995-s19)) slides. There are two versions: PDF and HTML (press `p` for notes). 
+
+* AI Introduction
+* Search Techniques (based on Stanford IA Course)
+* Evolutionary Computation
+* Machine Learning Slides: Slides from the ML subject. These slides are based on the COMS W4495 ([Applied Machine Learning, Andreas Müller](https://github.com/amueller/COMS4995-s19)) slides. There are two versions: PDF and HTML (press `p` to switch between preview mode and notes). 
